@@ -1,11 +1,11 @@
-##一.主要流程
+## 一.主要流程
 跟其他unix系统一样,openwrt系统启动,首先是boot加载kernel,kernel最终调用`/etc/preinit`开始整个启动流程.
 
 原文请参考:[Preinit and Root Mount and Firstboot Scripts](https://wiki.openwrt.org/doc/techref/preinit_mount)
 
 	preinit -> init -> inittab -> rcS -> /etc/rc.d/^S* (S开头的脚本)
-##二.各流程理解
-###1. preinit流程
+## 二.各流程理解
+### 1. preinit流程
 
 + **文件位置:**`1.8.xx\package\base-files\files\etc`
 
@@ -103,12 +103,12 @@ preinit整个操作最后调用的一个钩子操作是`99_10_run_init`
 	boot_hook_add preinit_main run_init
 可以看到,`run_init`最终调用`exec env - PATH=$pi_init_path $pi_init_env $pi_init_cmd`,这里的`pi_init_cmd`就是在脚本开始处指明的init程序`/sbin/init`,然后开始init流程~!
 
-###2. init流程
+### 2. init流程
 
 + **源文件:**`init`可执行程序由`busybox`编译得到.
 + **过程:**`init`程序最终会演变成init进程,一直存在于系统. 这个过程中它会解析`/etc/inittab`文件,并根据规则执行inittab中预定的操作.
 
-###3. inittab
+### 3. inittab
 
 + **源文件:**`1.8.xx\package\base-files\files\etc`
 + **源码解析:**
@@ -123,7 +123,7 @@ preinit整个操作最后调用的一个钩子操作是`99_10_run_init`
 `/etc/init.d/rcS S boot`
 接下来就进入了`rcS`的执行过程
 
-###4. rcS
+### 4. rcS
 
 + **源文件:**`1.8.xx\package\base-files\files\etc\init.d\rcS`
 + **源码:**
@@ -159,6 +159,6 @@ preinit整个操作最后调用的一个钩子操作是`99_10_run_init`
 
 `/etc/rc.d/^S*`执行每个脚本,执行完毕,系统也就启动完成了.
 
-##二. /etc/init.d/自定义启动脚本
+## 二. /etc/init.d/自定义启动脚本
 看这里[官方文档](https://wiki.openwrt.org/doc/techref/initscripts#enableanddisable)
 
