@@ -4,6 +4,7 @@
 原文请参考:[Preinit and Root Mount and Firstboot Scripts](https://wiki.openwrt.org/doc/techref/preinit_mount)
 
 	preinit -> init -> inittab -> rcS -> /etc/rc.d/^S* (S开头的脚本)
+![](https://i.imgur.com/WGZ1eXV.png)
 ## 二.各流程理解
 ### 1. preinit流程
 
