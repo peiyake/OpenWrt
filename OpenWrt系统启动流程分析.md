@@ -1,3 +1,24 @@
+<link rel="stylesheet" href="http://yandex.st/highlightjs/6.2/styles/googlecode.min.css">
+ 
+<script src="http://code.jquery.com/jquery-1.7.2.min.js"></script>
+<script src="http://yandex.st/highlightjs/6.2/highlight.min.js"></script>
+ 
+<script>hljs.initHighlightingOnLoad();</script>
+<script type="text/javascript">
+ $(document).ready(function(){
+      $("h2,h3,h4,h5,h6").each(function(i,item){
+        var tag = $(item).get(0).localName;
+        $(item).attr("id","wow"+i);
+        $("#category").append('<a class="new'+tag+'" href="#wow'+i+'">'+$(this).text()+'</a></br>');
+        $(".newh2").css("margin-left",0);
+        $(".newh3").css("margin-left",20);
+        $(".newh4").css("margin-left",40);
+        $(".newh5").css("margin-left",60);
+        $(".newh6").css("margin-left",80);
+      });
+ });
+</script>
+<div id="category"></div>
 ## 一.主要流程
 跟其他unix系统一样,openwrt系统启动,首先是boot加载kernel,kernel最终调用`/etc/preinit`开始整个启动流程.
 
@@ -160,9 +181,9 @@ preinit整个操作最后调用的一个钩子操作是`99_10_run_init`
 
 `/etc/rc.d/^S*`执行每个脚本,执行完毕,系统也就启动完成了.
 
-## 二. /etc/init.d/自定义启动脚本
+## 三. /etc/init.d/自定义启动脚本
 写法很简单,看这里[官方文档](https://wiki.openwrt.org/doc/techref/initscripts#enableanddisable)
-## 三. 如何实现固件中程序开机自启动
+## 四. 如何实现固件中程序开机自启动
 
 ### 1. 方法
 + 首先,要先实现一个自定义的模块可以编译到固件中,比如下面是一个例子的目录结构:
@@ -203,7 +224,7 @@ preinit整个操作最后调用的一个钩子操作是`99_10_run_init`
 ![](https://i.imgur.com/U2gbu5S.png)
 
 ## 附件
-+ **代码1**
+### 代码1
 
 		include $(TOPDIR)/rules.mk
 		
