@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>OpenWrt系统启动流程分析</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<style type="text/css">
+/* GitHub stylesheet for MarkdownPad (http://markdownpad.com) */
+/* Author: Nicolas Hery - http://nicolashery.com */
+/* Version: b13fe65ca28d2e568c6ed5d7f06581183df8f2ff */
+/* Source: https://github.com/nicolahery/markdownpad-github */
+
+/* RESET
+=============================================================================*/
+
+html, body, div, span, applet, object, iframe, h1, h2, h3, h4, h5, h6, p, blockquote, pre, a, abbr, acronym, address, big, cite, code, del, dfn, em, img, ins, kbd, q, s, samp, small, strike, strong, sub, sup, tt, var, b, u, i, center, dl, dt, dd, ol, ul, li, fieldset, form, label, legend, table, caption, tbody, tfoot, thead, tr, th, td, article, aside, canvas, details, embed, figure, figcaption, footer, header, hgroup, menu, nav, output, ruby, section, summary, time, mark, audio, video {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* BODY
+=============================================================================*/
+
+body {
+  font-family: Helvetica, arial, freesans, clean, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #333;
+  background-color: #fff;
+  padding: 20px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+body>*:first-child {
+  margin-top: 0 !important;
+}
+
+body>*:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* BLOCKS
+=============================================================================*/
+
+p, blockquote, ul, ol, dl, table, pre {
+  margin: 15px 0;
+}
+
+/* HEADERS
+=============================================================================*/
+
+h1, h2, h3, h4, h5, h6 {
+  margin: 20px 0 10px;
+  padding: 0;
+  font-weight: bold;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1 tt, h1 code, h2 tt, h2 code, h3 tt, h3 code, h4 tt, h4 code, h5 tt, h5 code, h6 tt, h6 code {
+  font-size: inherit;
+}
+
+h1 {
+  font-size: 28px;
+  color: #000;
+}
+
+h2 {
+  font-size: 24px;
+  border-bottom: 1px solid #ccc;
+  color: #000;
+}
+
+h3 {
+  font-size: 18px;
+}
+
+h4 {
+  font-size: 16px;
+}
+
+h5 {
+  font-size: 14px;
+}
+
+h6 {
+  color: #777;
+  font-size: 14px;
+}
+
+body>h2:first-child, body>h1:first-child, body>h1:first-child+h2, body>h3:first-child, body>h4:first-child, body>h5:first-child, body>h6:first-child {
+  margin-top: 0;
+  padding-top: 0;
+}
+
+a:first-child h1, a:first-child h2, a:first-child h3, a:first-child h4, a:first-child h5, a:first-child h6 {
+  margin-top: 0;
+  padding-top: 0;
+}
+
+h1+p, h2+p, h3+p, h4+p, h5+p, h6+p {
+  margin-top: 10px;
+}
+
+/* LINKS
+=============================================================================*/
+
+a {
+  color: #4183C4;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* LISTS
+=============================================================================*/
+
+ul, ol {
+  padding-left: 30px;
+}
+
+ul li > :first-child, 
+ol li > :first-child, 
+ul li ul:first-of-type, 
+ol li ol:first-of-type, 
+ul li ol:first-of-type, 
+ol li ul:first-of-type {
+  margin-top: 0px;
+}
+
+ul ul, ul ol, ol ol, ol ul {
+  margin-bottom: 0;
+}
+
+dl {
+  padding: 0;
+}
+
+dl dt {
+  font-size: 14px;
+  font-weight: bold;
+  font-style: italic;
+  padding: 0;
+  margin: 15px 0 5px;
+}
+
+dl dt:first-child {
+  padding: 0;
+}
+
+dl dt>:first-child {
+  margin-top: 0px;
+}
+
+dl dt>:last-child {
+  margin-bottom: 0px;
+}
+
+dl dd {
+  margin: 0 0 15px;
+  padding: 0 15px;
+}
+
+dl dd>:first-child {
+  margin-top: 0px;
+}
+
+dl dd>:last-child {
+  margin-bottom: 0px;
+}
+
+/* CODE
+=============================================================================*/
+
+pre, code, tt {
+  font-size: 12px;
+  font-family: Consolas, "Liberation Mono", Courier, monospace;
+}
+
+code, tt {
+  margin: 0 0px;
+  padding: 0px 0px;
+  white-space: nowrap;
+  border: 1px solid #eaeaea;
+  background-color: #f8f8f8;
+  border-radius: 3px;
+}
+
+pre>code {
+  margin: 0;
+  padding: 0;
+  white-space: pre;
+  border: none;
+  background: transparent;
+}
+
+pre {
+  background-color: #f8f8f8;
+  border: 1px solid #ccc;
+  font-size: 13px;
+  line-height: 19px;
+  overflow: auto;
+  padding: 6px 10px;
+  border-radius: 3px;
+}
+
+pre code, pre tt {
+  background-color: transparent;
+  border: none;
+}
+
+kbd {
+    -moz-border-bottom-colors: none;
+    -moz-border-left-colors: none;
+    -moz-border-right-colors: none;
+    -moz-border-top-colors: none;
+    background-color: #DDDDDD;
+    background-image: linear-gradient(#F1F1F1, #DDDDDD);
+    background-repeat: repeat-x;
+    border-color: #DDDDDD #CCCCCC #CCCCCC #DDDDDD;
+    border-image: none;
+    border-radius: 2px 2px 2px 2px;
+    border-style: solid;
+    border-width: 1px;
+    font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
+    line-height: 10px;
+    padding: 1px 4px;
+}
+
+/* QUOTES
+=============================================================================*/
+
+blockquote {
+  border-left: 4px solid #DDD;
+  padding: 0 15px;
+  color: #777;
+}
+
+blockquote>:first-child {
+  margin-top: 0px;
+}
+
+blockquote>:last-child {
+  margin-bottom: 0px;
+}
+
+/* HORIZONTAL RULES
+=============================================================================*/
+
+hr {
+  clear: both;
+  margin: 15px 0;
+  height: 0px;
+  overflow: hidden;
+  border: none;
+  background: transparent;
+  border-bottom: 4px solid #ddd;
+  padding: 0;
+}
+
+/* TABLES
+=============================================================================*/
+
+table th {
+  font-weight: bold;
+}
+
+table th, table td {
+  border: 1px solid #ccc;
+  padding: 6px 13px;
+}
+
+table tr {
+  border-top: 1px solid #ccc;
+  background-color: #fff;
+}
+
+table tr:nth-child(2n) {
+  background-color: #f8f8f8;
+}
+
+/* IMAGES
+=============================================================================*/
+
+img {
+  max-width: 100%
+}
+</style>
+</head>
+<body>
+<p><link rel="stylesheet" href="http://yandex.st/highlightjs/6.2/styles/googlecode.min.css"></p>
+<p><script src="http://code.jquery.com/jquery-1.7.2.min.js"></script>
+<script src="http://yandex.st/highlightjs/6.2/highlight.min.js"></script></p>
+<p><script>hljs.initHighlightingOnLoad();</script></p>
+<script type="text/javascript">
+ $(document).ready(function(){
+      $("h2,h3,h4,h5,h6").each(function(i,item){
+        var tag = $(item).get(0).localName;
+        $(item).attr("id","wow"+i);
+        $("#category").append('<a class="new'+tag+'" href="#wow'+i+'">'+$(this).text()+'</a></br>');
+        $(".newh2").css("margin-left",0);
+        $(".newh3").css("margin-left",20);
+        $(".newh4").css("margin-left",40);
+        $(".newh5").css("margin-left",60);
+        $(".newh6").css("margin-left",80);
+      });
+ });
+</script>
+<div id="category"></div>
+<h2>一.主要流程</h2>
+<p>跟其他unix系统一样,openwrt系统启动,首先是boot加载kernel,kernel最终调用<code>/etc/preinit</code>开始整个启动流程.</p>
+<p>原文请参考:<a href="https://wiki.openwrt.org/doc/techref/preinit_mount">Preinit and Root Mount and Firstboot Scripts</a></p>
+<pre><code>preinit -&gt; init -&gt; inittab -&gt; rcS -&gt; /etc/rc.d/^S* (S开头的脚本)
+</code></pre>
+
+<p><img src="https://i.imgur.com/WGZ1eXV.png" /></p>
+<h2>二.各流程理解</h2>
+<h3>1. preinit流程</h3>
+<ul>
+<li>
+<p><strong>文件位置:</strong><code>1.8.xx\package\base-files\files\etc</code></p>
+</li>
+<li>
+<p><strong>源文件:</strong></p>
+<pre><code>#!/bin/sh
+# Copyright (C) 2006 OpenWrt.org
+# Copyright (C) 2010 Vertical Communications
+
+#初始化PATH环境变量
+export PATH=/bin:/sbin:/usr/bin:/usr/sbin:/appfs/usr/sbin:/appfs/usr/bin
+
+#定义的一些变量供后期使用
+pi_ifname=
+pi_ip=192.168.1.1
+pi_broadcast=192.168.1.255
+pi_netmask=255.255.255.0
+
+fs_failsafe_ifname=
+fs_failsafe_ip=192.168.1.1
+fs_failsafe_broadcast=192.168.1.255
+fs_failsafe_netmask=255.255.255.0
+
+fs_failsafe_wait_timeout=2
+
+pi_suppress_stderr=&quot;y&quot;
+pi_init_suppress_stderr=&quot;y&quot;
+pi_init_path=&quot;/bin:/sbin:/usr/bin:/usr/sbin&quot;
+pi_init_cmd=&quot;/sbin/init&quot;    
+
+#加载functions.sh和boot.sh 可以理解为C语言的#include&lt;xxx&gt;
+#注意. shell.sh和 source shell.sh执行方式的差别
+. /lib/functions.sh
+. /lib/functions/boot.sh
+
+#设置5个hook结点,每个结点可以理解成一个步骤或者一种模式
+boot_hook_init preinit_essential    #必要流程,挂在proc文件系统等操作
+boot_hook_init preinit_main         #主要流程
+boot_hook_init failsafe             #进入安全模式使用
+boot_hook_init initramfs            #INITRAMFS不为NULL时才执行
+boot_hook_init preinit_mount_root   #INITRAMFS=1时才走此流程
+
+
+#把/lib/preinit/下所有脚本执行一遍,并且所有脚本函数都加载到本shell
+for pi_source_file in /lib/preinit/*; do
+    . $pi_source_file
+done
+
+#执行preinit_essential钩子结点的操作
+boot_run_hook preinit_essential
+
+#不知道干啥
+pi_mount_skip_next=false
+pi_jffs2_mount_success=false
+pi_failsafe_net_message=false
+
+#执行preinit_main钩子结点的操作
+boot_run_hook preinit_main
+</code></pre>
+
+</li>
+<li><strong>hook理解</strong></li>
+</ul>
+<p>preinit脚本中调用的<code>boot.sh</code>中设置钩子函数,主要是这三个函数:</p>
+<pre><code>boot_hook_init
+boot_hook_add
+boot_run_hook
+</code></pre>
+
+<p>首先,<code>preinit</code>调用<code>boot_hook_init</code>设置了5个钩子点,你可以想象成一个人开了5间房,先放在一边.</p>
+<p>然后,</p>
+<pre><code>for pi_source_file in /lib/preinit/*; do
+    . $pi_source_file
+done
+</code></pre>
+
+<p>这个for循环,执行各个脚本. 注意:每个脚本的最后都调用了<code>boot_hook_add</code>,此函数有两个参数,第一个参数是指定需要注册的钩子点(进入哪个房间),第二个参数指定了在钩子内计划执行的操作(相当于进入房间后,计划一下要干什么).</p>
+<p>最后,preinit先后调用了<code>boot_run_hook preinit_essential</code>和<code>boot_run_hook preinit_main</code>,意思是执行这两个钩子点挂载的钩子操作. 也就是刚刚说到的.</p>
+<ul>
+<li><strong>preinit结尾</strong>:</li>
+</ul>
+<p>preinit整个操作最后调用的一个钩子操作是<code>99_10_run_init</code></p>
+<pre><code>#!/bin/sh
+# Copyright (C) 2006 OpenWrt.org
+# Copyright (C) 2010 Vertical Communications
+
+run_init() {
+    preinit_echo &quot;- init -&quot;
+    preinit_ip_deconfig
+    if [ &quot;$pi_init_suppress_stderr&quot; = &quot;y&quot; ]; then
+    exec env - PATH=$pi_init_path $pi_init_env $pi_init_cmd 2&gt;&amp;0
+    else
+    exec env - PATH=$pi_init_path $pi_init_env $pi_init_cmd
+    fi
+}
+
+boot_hook_add preinit_main run_init
+</code></pre>
+
+<p>可以看到,<code>run_init</code>最终调用<code>exec env - PATH=$pi_init_path $pi_init_env $pi_init_cmd</code>,这里的<code>pi_init_cmd</code>就是在脚本开始处指明的init程序<code>/sbin/init</code>,然后开始init流程~!</p>
+<h3>2. init流程</h3>
+<ul>
+<li><strong>源文件:</strong><code>init</code>可执行程序由<code>busybox</code>编译得到.</li>
+<li><strong>过程:</strong><code>init</code>程序最终会演变成init进程,一直存在于系统. 这个过程中它会解析<code>/etc/inittab</code>文件,并根据规则执行inittab中预定的操作.</li>
+</ul>
+<h3>3. inittab</h3>
+<ul>
+<li><strong>源文件:</strong><code>1.8.xx\package\base-files\files\etc</code></li>
+<li>
+<p><strong>源码解析:</strong></p>
+<pre><code>::sysinit:/etc/init.d/rcS S boot
+::shutdown:/etc/init.d/rcS K shutdown
+ttyS0::askfirst:/bin/ash --login
+tty1::askfirst:/bin/ash --login
+</code></pre>
+
+<p>有关<code>inittab</code>文件的介绍请看这里:<a href="https://git.busybox.net/busybox/tree/examples/inittab">inittab文件说明</a></p>
+</li>
+</ul>
+<p>其中第一行:<code>::sysinit:/etc/init.d/rcS S boot</code>指定,在系统启动或者重启时才执行,执行的程序是:
+<code>/etc/init.d/rcS S boot</code>
+接下来就进入了<code>rcS</code>的执行过程</p>
+<h3>4. rcS</h3>
+<ul>
+<li><strong>源文件:</strong><code>1.8.xx\package\base-files\files\etc\init.d\rcS</code></li>
+<li>
+<p><strong>源码:</strong></p>
+<pre><code>#!/bin/sh
+# Copyright (C) 2006 OpenWrt.org
+
+#查找所有/etc/rc.d下所有S开头的脚本,依据优先级依次执行
+run_scripts() {
+    for i in /etc/rc.d/$1*; do
+        [ -x $i ] &amp;&amp; $i $2 2&gt;&amp;1
+    done | $LOGGER
+}
+
+system_config() {
+    config_get_bool foreground $1 foreground 0
+}
+
+LOGGER=&quot;cat&quot;
+[ -x /usr/bin/logger ] &amp;&amp; LOGGER=&quot;logger -s -p 6 -t sysinit&quot;
+
+. /lib/functions.sh
+
+config_load system
+config_foreach system_config system
+
+if [ &quot;$1&quot; = &quot;S&quot; -a &quot;$foreground&quot; != &quot;1&quot; ]; then
+    run_scripts &quot;$1&quot; &quot;$2&quot; &amp;
+else
+    run_scripts &quot;$1&quot; &quot;$2&quot;
+fi
+</code></pre>
+
+</li>
+<li><strong>rcS最终</strong></li>
+</ul>
+<p><code>/etc/rc.d/^S*</code>执行每个脚本,执行完毕,系统也就启动完成了.</p>
+<h2>三. /etc/init.d/自定义启动脚本</h2>
+<p>写法很简单,看这里<a href="https://wiki.openwrt.org/doc/techref/initscripts#enableanddisable">官方文档</a></p>
+<h2>四. 如何实现固件中程序开机自启动</h2>
+<h3>1. 方法</h3>
+<ul>
+<li>首先,要先实现一个自定义的模块可以编译到固件中,比如下面是一个例子的目录结构:
+<img src="https://i.imgur.com/SKy2HNr.png" /></li>
+<li>
+<p>然后,编写程序启动/停止控制脚本 <code>files/demo.init</code>,例如:</p>
+<pre><code>#!/bin/sh /etc/rc.common
+START=10
+STOP=15
+
+start()
+{
+    echo &quot;process demo start!&quot;
+    /usr/sbin/demo &amp;    #这个方法不可取,好像可以直接使用service_start函数启动,还没有研究
+}
+stop()
+{
+    echo &quot;process demo stop!&quot;
+    killall demo
+}
+</code></pre>
+
+<p><strong>如果要实现程序开机自启动,脚本中的<code>START</code>定义必不可少,如果定义了<code>START</code>和<code>STOP</code>,那么固件编译过程中会自动在最终文件系统<code>/etc/rc.d/</code>目录下创建程序开机启动和关机停止的软连接.这样根据系统启动流程中描述,就可以知道程序会在系统启动过程中被执行</strong></p>
+</li>
+<li>
+<p>最后,还有一点必不可少,就是在<code>Makefile</code>的install中必须将<code>demo.init</code>拷贝到<code>/etc/init.d</code>目录下,如下:</p>
+<pre><code>define Package/demo/install
+    $(INSTALL_DIR) $(1)/usr/sbin
+    $(INSTALL_BIN) $(PKG_BUILD_DIR)/demo $(1)/usr/sbin/
+    $(INSTALL_DIR) $(1)/etc/init.d
+    $(INSTALL_BIN) files/demo.init $(1)/etc/init.d/demo
+endef
+</code></pre>
+
+</li>
+</ul>
+<p>按照此方法,编译最终固件烧入硬件设备,那么这个<code>demo</code>程序在开机后就直接启动了!!</p>
+<h3>2. 原理</h3>
+<p><code>$TOPDIR/package/Makefile</code>中会遍历<code>/etc/init.d/</code>下所有控制脚本,并对所有脚本调用<code>enable</code>函数(该函数在<code>/etc/rc.common</code>中被定义),如果脚本中定义了<code>START</code>和<code>STOP</code>就在<code>/etc/rc.d/</code>目录下创建软连接.</p>
+<ul>
+<li><code>$TOPDIR/package/Makefile</code>部分代码:
+<img src="https://i.imgur.com/G9mHf4f.png" /></li>
+<li><code>/etc/rc.common</code>文件中<code>enable</code>函数定义:
+<img src="https://i.imgur.com/U2gbu5S.png" /></li>
+</ul>
+<h2>附件</h2>
+<h3>代码1</h3>
+<pre><code>    include $(TOPDIR)/rules.mk
+
+    PKG_NAME:=demo
+    PKG_VERSION:=2015-08-24
+    PKG_RELEASE:=
+
+    #PKG_SOURCE_LOCAL:=$(TOPDIR)/local/$(PKG_NAME)
+
+    #PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)$(if $(PKG_VERSION),-$(PKG_VERSION))
+    #PKG_BUILD_DIR:=$(KERNEL_BUILD_DIR)/$(PKG_NAME)$(if $(PKG_VERSION),-$(PKG_VERSION))
+    PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
+
+    #include $(INCLUDE_DIR)/package-version-override.mk
+    include $(INCLUDE_DIR)/package.mk
+
+    define Package/demo
+      SECTION:=local
+      CATEGORY:=Local Packages
+      SUBMENU:=App
+      TITLE:=Package for demo
+    endef
+
+    define Package/demo/description
+     This package is just a demo!
+    endef
+
+
+    define Build/Prepare
+        rm -fr $(PKG_BUILD_DIR);
+        cp -fr src $(PKG_BUILD_DIR);
+    endef
+
+    #define Build/Compile
+    #endef
+
+    #define Build/Clean
+    #endef
+
+
+    define Package/demo/install
+        $(INSTALL_DIR) $(1)/usr/sbin
+        $(INSTALL_BIN) $(PKG_BUILD_DIR)/demo $(1)/usr/sbin/
+        $(INSTALL_DIR) $(1)/etc/init.d
+        $(INSTALL_BIN) files/demo.init $(1)/etc/init.d/demo
+    endef
+
+    $(eval $(call BuildPackage,demo))
+</code></pre>
+
+
+</body>
+</html>
+<!-- This document was created with MarkdownPad, the Markdown editor for Windows (http://markdownpad.com) -->
