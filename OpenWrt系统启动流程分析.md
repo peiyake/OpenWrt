@@ -161,5 +161,95 @@ preinit整个操作最后调用的一个钩子操作是`99_10_run_init`
 `/etc/rc.d/^S*`执行每个脚本,执行完毕,系统也就启动完成了.
 
 ## 二. /etc/init.d/自定义启动脚本
-看这里[官方文档](https://wiki.openwrt.org/doc/techref/initscripts#enableanddisable)
+写法很简单,看这里[官方文档](https://wiki.openwrt.org/doc/techref/initscripts#enableanddisable)
+## 三. 如何实现固件中程序开机自启动
+
+### 1. 方法
++ 首先,要先实现一个自定义的模块可以编译到固件中,比如下面是一个例子的目录结构:
+![](https://i.imgur.com/SKy2HNr.png)
++ 然后,编写程序启动/停止控制脚本 `files/demo.init`,例如:
+
+		#!/bin/sh /etc/rc.common
+		START=10
+		STOP=15
+		
+		start()
+		{
+			echo "process demo start!"
+			/usr/sbin/demo &
+		}
+		stop()
+		{
+			echo "process demo stop!"
+			killall demo
+		}
+**如果要实现程序开机自启动,脚本中的`START`定义必不可少,如果定义了`START`和`STOP`,那么固件编译过程中会自动在最终文件系统`/etc/rc.d/`目录下创建程序开机启动和关机停止的软连接.这样根据系统启动流程中描述,就可以知道程序会在系统启动过程中被执行**
++ 最后,还有一点必不可少,就是在`Makefile`的install中必须将`demo.init`拷贝到`/etc/init.d`目录下,如下:
+
+		define Package/demo/install
+			$(INSTALL_DIR) $(1)/usr/sbin
+			$(INSTALL_BIN) $(PKG_BUILD_DIR)/demo $(1)/usr/sbin/
+			$(INSTALL_DIR) $(1)/etc/init.d
+			$(INSTALL_BIN) files/demo.init $(1)/etc/init.d/demo
+		endef
+
+按照此方法,编译最终固件烧入硬件设备,那么这个`demo`程序在开机后就直接启动了!!
+### 2. 原理
+`$TOPDIR/package/Makefile`中会遍历`/etc/init.d/`下所有控制脚本,并对所有脚本调用`enable`函数(该函数在`/etc/rc.common`中被定义),如果脚本中定义了`START`和`STOP`就在`/etc/rc.d/`目录下创建软连接.
+
++ `$TOPDIR/package/Makefile`部分代码:
+![](https://i.imgur.com/G9mHf4f.png)
++ `/etc/rc.common`文件中`enable`函数定义:
+![](https://i.imgur.com/U2gbu5S.png)
+
+## 附件
++ **代码1**
++ 
+		include $(TOPDIR)/rules.mk
+		
+		PKG_NAME:=demo
+		PKG_VERSION:=2015-08-24
+		PKG_RELEASE:=
+		
+		#PKG_SOURCE_LOCAL:=$(TOPDIR)/local/$(PKG_NAME)
+		
+		#PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)$(if $(PKG_VERSION),-$(PKG_VERSION))
+		#PKG_BUILD_DIR:=$(KERNEL_BUILD_DIR)/$(PKG_NAME)$(if $(PKG_VERSION),-$(PKG_VERSION))
+		PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
+		
+		#include $(INCLUDE_DIR)/package-version-override.mk
+		include $(INCLUDE_DIR)/package.mk
+		
+		define Package/demo
+		  SECTION:=local
+		  CATEGORY:=Local Packages
+		  SUBMENU:=App
+		  TITLE:=Package for demo
+		endef
+		
+		define Package/demo/description
+		 This package is just a demo!
+		endef
+		
+		
+		define Build/Prepare
+			rm -fr $(PKG_BUILD_DIR);
+			cp -fr src $(PKG_BUILD_DIR);
+		endef
+		
+		#define Build/Compile
+		#endef
+		
+		#define Build/Clean
+		#endef
+		
+		
+		define Package/demo/install
+			$(INSTALL_DIR) $(1)/usr/sbin
+			$(INSTALL_BIN) $(PKG_BUILD_DIR)/demo $(1)/usr/sbin/
+			$(INSTALL_DIR) $(1)/etc/init.d
+			$(INSTALL_BIN) files/demo.init $(1)/etc/init.d/demo
+		endef
+		
+		$(eval $(call BuildPackage,demo))
 
