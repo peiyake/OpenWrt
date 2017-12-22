@@ -176,7 +176,7 @@ preinit整个操作最后调用的一个钩子操作是`99_10_run_init`
 		start()
 		{
 			echo "process demo start!"
-			/usr/sbin/demo &
+			/usr/sbin/demo &	#这个方法不可取,好像可以直接使用service_start函数启动,还没有研究
 		}
 		stop()
 		{
@@ -204,7 +204,7 @@ preinit整个操作最后调用的一个钩子操作是`99_10_run_init`
 
 ## 附件
 + **代码1**
-+ 
+
 		include $(TOPDIR)/rules.mk
 		
 		PKG_NAME:=demo
