@@ -1,0 +1,164 @@
+= openwrt vsftpd 虚拟多用户配置采坑记录
+
+本篇主要讲在openwrt-x86系统上使用pam_userdb.so配置vsftpd的虚拟多用户登录功能。在此之前已经在centos
+系统上完成了配置，但是发现照搬过来之后无法使用。由此开始了采坑之旅...
+
+'''
+[NOTE]
+====
+ . openwrt中vsftpd默认不支持虚拟用户，因为其禁用了pam
+ . openwrt中libpam默认禁用了Berleley DB (libdb47)
+ . libdb47默认不安装db_load等工具
+
+====
+
+_注意：下文中所有路径都是相对于你的openwrt编译环境主目录的_
+
+== vsfpd修改
+起初并不知道openwrt默认不支持虚拟用户，在一遍又一遍的测试后才意识到。此时：在网上搜索大量资料无果后
+只能到vsftpd源码文件中寻求答案，功夫不负有心人，终于源码目录中有个文件*builddefs.h*引起我的注意
+
+`build_dir/target-x86_64_glibc-2.21/vsftpd-tls/vsftpd-3.0.2/builddefs.h`
+
+查看其内容，如下：
+[source,c]
+----
+#ifndef VSF_BUILDDEFS_H
+#define VSF_BUILDDEFS_H
+
+#undef VSF_BUILD_TCPWRAPPERS
+#undef VSF_BUILD_PAM
+#define VSF_BUILD_SSL
+
+#endif /* VSF_BUILDDEFS_H */
+----
+
+此时看到，`#undef VSF_BUILD_PAM`或许你就立即明白了。没错，就是如你所想，这个宏就是虚拟用户功能的开关
+当它被定义时，编译的vsftpd就支持pam，支持虚拟用户。当它没有被定义时就不支持。
+
+那么接下来我们就修改这个文件后再次编译出ipk包，然后在我们的系统上重新安装就好了。 那么该怎么修改这个文件
+呢？此时，当我查看vsftpd的packages定义Makefile时发现，其中可以直接修改。
+
+Makefile文件路径：
+`package/feeds/packages/vsftpd`
+
+Makefile文件部分内容如下：
+[source,Makefile]
+----
+define Package/vsftpd-tls
+$(call Package/vsftpd/Default)
+  VARIANT:=tls
+  TITLE+= (TLS)
+  #修改1:  添加 +libpam ， 虚拟用户功能编译时依赖的动态库
+  DEPENDS+=+libopenssl +libpam
+endef
+
+define Package/vsftpd/conffiles
+/etc/vsftpd.conf
+endef
+
+Package/vsftpd-tls/conffiles=$(Package/vsftpd/conffiles)
+
+ifeq ($(BUILD_VARIANT),notls)
+ define Build/Compile
+	$(MAKE) -C $(PKG_BUILD_DIR) \
+		CC="$(TARGET_CC)" \
+		CFLAGS="$(TARGET_CFLAGS)" \
+		LDFLAGS="$(TARGET_LDFLAGS)" \
+		vsftpd
+ endef
+endif
+
+ifeq ($(BUILD_VARIANT),tls)
+ define Build/Compile
+	$(SED) 's/#undef VSF_BUILD_SSL/#define VSF_BUILD_SSL/' $(PKG_BUILD_DIR)/builddefs.h
+  #修改点2： 添加下面一行，修改builddefs.h文件，定义VSF_BUILD_PAM宏
+	$(SED) 's/#undef VSF_BUILD_PAM/#define VSF_BUILD_PAM/' $(PKG_BUILD_DIR)/builddefs.h
+  #修改点3: 下面一行，添加 -lpam ， 编译时指明动态链接库名字
+	$(SED) 's/-lcrypt -lnsl/-lcrypt -lnsl -lssl -lcrypto -lpam/' $(PKG_BUILD_DIR)/Makefile
+	$(MAKE) -C $(PKG_BUILD_DIR) \
+		CC="$(TARGET_CC)" \
+		CFLAGS="$(TARGET_CFLAGS)" \
+		LDFLAGS="$(TARGET_LDFLAGS)" \
+		vsftpd
+ endef
+endif
+----
+
+修改点 1、2、3都已经在上面代码中添加了注释，注意查看。
+
+接下来就是重新编译vsftpd，取出ipk然后重新在系统上安装
+
+== libpam修改
+
+libpam默认禁用Berleley DB (libdb47)，也就是你在系统中找不到 `pam_userdb.so`这个认证库。那么怎么才能
+让它支持呢？没错，答案也是在源码中寻找。
+
+对于这一点，我首先想到的是：大部分源码在编译的时候都有一个`./configure ..`执行配置的过程，这里可能会
+配置哪些功能需要编译，哪些功能不需要。  想到这里，我进入libpam源码执行了一下 `./configure --help`,
+果然看到了有个对db的编译开关，`--enable-db=(db|ndbm|yes|no)`。我想，这大概就是了。
+
+看到这里，那又该怎么修改呢？
+
+熟悉openwrt的同学一定知道，这个`./configure`的配置也是在相应的packages Makefile中的。我们找到它的Makefile
+路径如下：
+
+`package/feeds/packages/libpam/Makefile`
+
+打开后，
+
+[source,Makefile]
+----
+define Build/Configure
+        $(call Build/Configure/Default, \
+                --enable-shared \
+                --enable-static \
+                --enable-pamlocking \
+                --disable-prelude \
+                --disable-lckpwdf \
+                --disable-selinux \
+                --disable-nls \
+                --disable-rpath \
+                --disable-nis \
+                --disable-regenerate-docu \
+                --enable-db=no \
+        )
+endef
+----
+可以看到默认的配置是`--enable-db=no`,我们把这里修改`--enable-db=yes`就可以了。
+
+对了，这里可能还要添加个依赖库 `DEPENDS:=+libdb47`,如下所示：
+
+  define Package/libpam
+  SECTION:=libs
+  CATEGORY:=Libraries
+  TITLE:=the Linux-PAM libraries and modules.
+    DEPENDS:=+libdb47  #这是增加的内容
+    URL:=http://www.kernel.org/pub/linux/libs/pam
+  endef
+
+最后，也是重新编译此包，获取ipk后重新在系统中安装。
+
+== libdb47修改
+
+配置过vsftpd虚拟用户的同学一定知道，要使用pam_userdb.so认证，那么必须生成一个*.d用户名密码存储文件
+，生成这个文件需要`db_load`工具，而这个工具在openwrt的libdb47中默认没有被安装。 实际上，db_load工具
+已经被编译了，只是没有安装到系统中。
+
+同样我们直接找到libdb47的package Makefile文件：
+
+`package/feeds/packages/db47/Makefile`
+
+查看内容如下:
+[source,Makefile]
+----
+define Package/libdb47/install
+        $(INSTALL_DIR) $(1)/usr/lib
+        $(INSTALL_DIR) $(1)/usr/bin
+        $(CP) $(PKG_INSTALL_DIR)/usr/lib/libdb-*.so $(1)/usr/lib/
+        #修改点：增加下面一行，意思是安装bin目录下可执行文件，其中包括db_load
+        $(CP) $(PKG_INSTALL_DIR)/usr/bin/* $(1)/usr/bin/
+endef
+----
+
+修改点已经在文中标出。接下来就是重新编译出ipk，然后拿到系统上重新安装了。
